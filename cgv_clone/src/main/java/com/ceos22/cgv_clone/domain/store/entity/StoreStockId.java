@@ -9,6 +9,6 @@ import java.io.Serializable;
 @NoArgsConstructor
 @EqualsAndHashCode
 public class StoreStockId implements Serializable {
-    private Long store; // Store 엔티티의 store 필드와 이름 일치
-    private Long product; // Store 엔티티의 product 필드와 이름 일치
+    private Long store;
+    private Long product;
 }

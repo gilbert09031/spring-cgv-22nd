@@ -12,12 +12,12 @@ import lombok.NoArgsConstructor;
 @IdClass(StoreStockId.class) // 복합키로 사용할 ID 클래스 지정
 public class StoreStock {
 
-    @Id // 기본 키
+    @Id
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "store_id")
     private Store store;
 
-    @Id // 기본 키
+    @Id
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "product_id")
     private Product product;

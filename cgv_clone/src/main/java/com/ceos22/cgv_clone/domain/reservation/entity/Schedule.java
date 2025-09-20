@@ -3,15 +3,15 @@ package com.ceos22.cgv_clone.domain.reservation.entity;
 import com.ceos22.cgv_clone.domain.movie.entity.Movie;
 import com.ceos22.cgv_clone.domain.theater.entity.Screen;
 import jakarta.persistence.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Builder
+@AllArgsConstructor
 public class Schedule {
 
     @Id

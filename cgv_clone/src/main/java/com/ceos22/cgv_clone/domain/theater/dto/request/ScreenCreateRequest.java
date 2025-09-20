@@ -13,7 +13,7 @@ public record ScreenCreateRequest(
         @NotNull(message = "상영관 타입은 필수입니다")
         ScreenType type,
         
-        @NotBlank(message = "좌석 정보는 필수입니다")
+        @NotNull(message = "좌석 정보는 필수입니다")
         List<SeatCreateRequest> seats
 ) {
     public record SeatCreateRequest(

@@ -16,7 +16,6 @@ public class ActorService {
     private final ActorRepository actorRepository;
 
     public ActorResponse createActor(ActorCreateRequest request) {
-        // 동명이인 허용을 위해 이름 중복 검사 로직 제거
         Actor actor = Actor.builder()
                 .name(request.name())
                 .birthDate(request.birthDate())
