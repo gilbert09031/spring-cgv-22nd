@@ -6,7 +6,10 @@ import com.ceos22.cgv_clone.domain.movie.entity.Movie;
 import com.ceos22.cgv_clone.domain.movie.repository.MovieRepository;
 import com.ceos22.cgv_clone.domain.reservation.dto.request.ScheduleCreateRequest;
 import com.ceos22.cgv_clone.domain.reservation.dto.response.ScheduleResponse;
+import com.ceos22.cgv_clone.domain.reservation.dto.response.ScheduleSeatResponse;
+import com.ceos22.cgv_clone.domain.reservation.entity.Reservation;
 import com.ceos22.cgv_clone.domain.reservation.entity.Schedule;
+import com.ceos22.cgv_clone.domain.reservation.repository.ReservationRepository;
 import com.ceos22.cgv_clone.domain.reservation.repository.ScheduleRepository;
 import com.ceos22.cgv_clone.domain.theater.entity.Screen;
 import com.ceos22.cgv_clone.domain.theater.repository.ScreenRepository;
@@ -18,6 +21,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,6 +32,7 @@ public class ScheduleService {
     private final ScheduleRepository scheduleRepository;
     private final MovieRepository movieRepository;
     private final ScreenRepository screenRepository;
+    private final ReservationRepository reservationRepository;
 
     public ScheduleResponse createSchedule(ScheduleCreateRequest request) {
         // 제약사항 4: 영화 및 상영관 존재 여부 확인
@@ -70,5 +75,18 @@ public class ScheduleService {
         return schedules.stream()
                 .map(ScheduleResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public ScheduleSeatResponse findScheduleWithSeatStatus(Long scheduleId) {
+        Schedule schedule = scheduleRepository.findById(scheduleId)
+                .orElseThrow(() -> new CustomException(ErrorCode.SCHEDULE_NOT_FOUND));
+
+        List<Reservation> reservations = reservationRepository.findBySchedule(schedule);
+        Set<Long> reservedSeatIds = reservations.stream()
+                .map(reservation -> reservation.getSeat().getSeatId())
+                .collect(Collectors.toSet());
+
+        return ScheduleSeatResponse.from(schedule, reservedSeatIds);
     }
 }

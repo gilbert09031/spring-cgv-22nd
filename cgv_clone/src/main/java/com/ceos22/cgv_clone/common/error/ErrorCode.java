@@ -27,6 +27,9 @@ public enum ErrorCode {
     THEATER_NOT_FOUND(HttpStatus.NOT_FOUND, "T001", "요청한 영화관을 찾을 수 없습니다."),
     REGION_NOT_FOUND(HttpStatus.NOT_FOUND, "T002", "해당 지역을 찾을 수 없습니다."),
     SCREEN_NOT_FOUND(HttpStatus.NOT_FOUND, "T003", "요청한 상영관을 찾을 수 없습니다."),
+    SCHEDULE_NOT_FOUND(HttpStatus.NOT_FOUND, "S003", "요청한 상영 일정을 찾을 수 없습니다."),
+    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "A003", "해당 사용자를 찾을 수 없습니다."),
+    SEAT_NOT_FOUND(HttpStatus.NOT_FOUND, "T004", "요청한 좌석을 찾을 수 없습니다."),
 
     // 405 Method Not Allowed
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "C006", "허용되지 않은 메서드입니다."),
@@ -34,6 +37,7 @@ public enum ErrorCode {
     // 409 Conflict
     DUPLICATED_RESOURCE(HttpStatus.CONFLICT, "C008", "이미 존재하는 데이터입니다"),
     SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "S002", "해당 시간에 이미 다른 스케줄이 존재합니다."),
+    SEAT_ALREADY_RESERVED(HttpStatus.CONFLICT, "R001", "이미 예매된 좌석입니다."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C007", "서버 내부 오류가 발생했습니다.");

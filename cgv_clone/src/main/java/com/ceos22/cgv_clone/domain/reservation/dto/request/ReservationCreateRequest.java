@@ -1,15 +1,17 @@
 package com.ceos22.cgv_clone.domain.reservation.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+import java.util.List;
 
 public record ReservationCreateRequest(
-        @NotBlank(message = "회원 ID는 필수입니다")
-        String memberId,
+        @NotNull(message = "회원 ID는 필수입니다")
+        Long memberId,
 
-        @NotBlank(message = "스케쥴 ID는 필수입니다")
+        @NotNull(message = "스케쥴 ID는 필수입니다")
         Long scheduleId,
 
-        @NotBlank(message = "좌석 ID는 필수입니다")
-        Long seatId
+        @NotNull(message = "좌석 ID는 필수입니다")
+        List<Long> seatIds
 ) {
 }
