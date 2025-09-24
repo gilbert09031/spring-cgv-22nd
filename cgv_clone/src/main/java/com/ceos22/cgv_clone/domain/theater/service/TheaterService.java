@@ -2,8 +2,7 @@ package com.ceos22.cgv_clone.domain.theater.service;
 
 import com.ceos22.cgv_clone.common.error.CustomException;
 import com.ceos22.cgv_clone.common.error.ErrorCode;
-import com.ceos22.cgv_clone.domain.region.entity.Region;
-import com.ceos22.cgv_clone.domain.region.repository.RegionRepository;
+import com.ceos22.cgv_clone.domain.theater.entity.Region;
 import com.ceos22.cgv_clone.domain.theater.dto.request.ScreenCreateRequest;
 import com.ceos22.cgv_clone.domain.theater.dto.request.TheaterCreateRequest;
 import com.ceos22.cgv_clone.domain.theater.dto.response.TheaterResponse;
@@ -26,16 +25,12 @@ import java.util.stream.Collectors;
 public class TheaterService {
 
     private final TheaterRepository theaterRepository;
-    private final RegionRepository regionRepository;
     private final ScreenRepository screenRepository;
     private final SeatRepository seatRepository;
 
     public TheaterResponse createTheater(TheaterCreateRequest request) {
-        Region region = regionRepository.findById(request.regionId())
-                .orElseThrow(() -> new CustomException(ErrorCode.REGION_NOT_FOUND));
-
         Theater theater = Theater.builder()
-                .region(region)
+                .region(request.region())
                 .name(request.name())
                 .address(request.address())
                 .build();
@@ -70,8 +65,8 @@ public class TheaterService {
     }
 
     @Transactional(readOnly = true)
-    public List<TheaterResponse> findAllTheaters(Long regionId) {
-        List<Theater> theaters = theaterRepository.findByRegionRegionId(regionId);
+    public List<TheaterResponse> findTheatersByRegion(Region region) {
+        List<Theater> theaters = theaterRepository.findByRegion(region);
         return theaters.stream()
                 .map(TheaterResponse::from)
                 .collect(Collectors.toList());
