@@ -13,7 +13,6 @@ import com.ceos22.cgv_clone.domain.member.entity.Role;
 import com.ceos22.cgv_clone.domain.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -64,10 +63,8 @@ public class AuthService {
             throw new CustomException(ErrorCode.INVALID_PASSWORD);
         }
 
-        Authentication authentication = jwtTokenProvider.createAuthentication(member);
-
-        String accessToken = jwtTokenProvider.createAccessToken(member.getMemberId(), authentication);
-        String refreshToken = jwtTokenProvider.createRefreshToken(member.getMemberId(), authentication);
+        String accessToken = jwtTokenProvider.createAccessToken(member);
+        String refreshToken = jwtTokenProvider.createRefreshToken(member);
 
         log.info("로그인 처리 완료 {}", request.email());
 
@@ -88,10 +85,8 @@ public class AuthService {
         Member member = memberRepository.findById(Long.parseLong(userId))
                 .orElseThrow(()-> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
 
-        Authentication authentication = jwtTokenProvider.createAuthentication(member);
-
-        String newAccessToken = jwtTokenProvider.createAccessToken(member.getMemberId(), authentication);
-        String newRefreshToken = jwtTokenProvider.createRefreshToken(member.getMemberId(), authentication);
+        String newAccessToken = jwtTokenProvider.createAccessToken(member);
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(member);
 
         return TokenResponse.of(
                 newAccessToken,

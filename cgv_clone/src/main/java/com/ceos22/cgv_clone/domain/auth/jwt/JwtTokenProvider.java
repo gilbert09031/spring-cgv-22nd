@@ -1,6 +1,7 @@
 package com.ceos22.cgv_clone.domain.auth.jwt;
 
 import com.ceos22.cgv_clone.domain.member.entity.Member;
+import com.ceos22.cgv_clone.domain.member.entity.Role;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -11,17 +12,12 @@ import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.Date;
-import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -55,26 +51,22 @@ public class JwtTokenProvider implements InitializingBean {
         return null;
     }
 
-    public String createToken(Long id, Authentication authentication, Long expirationTime) {
-        String authorities = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.joining(","));
-
+    public String createToken(Long id, Role role, Long expirationTime) {
         return Jwts.builder()
                 .subject(String.valueOf(id))
-                .claim("auth", authorities)
+                .claim("auth", "ROLE_" + role.name())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + expirationTime))
                 .signWith(key)
                 .compact();
     }
 
-    public String createAccessToken(Long id, Authentication authentication) {
-        return createToken(id, authentication, accessTokenExpireTime);
+    public String createAccessToken(Member member) {
+        return createToken(member.getMemberId(), member.getRole(), accessTokenExpireTime);
     }
 
-    public String createRefreshToken(Long id, Authentication authentication) {
-        return createToken(id, authentication, refreshTokenExpireTime);
+    public String createRefreshToken(Member member) {
+        return createToken(member.getMemberId(), member.getRole(), refreshTokenExpireTime);
     }
 
     public String getTokenUserId(String token) {
@@ -86,7 +78,7 @@ public class JwtTokenProvider implements InitializingBean {
                 .getSubject();
     }
 
-    // userName -> memberId
+    // userName(jwt에서 사용자를 구분하기 위해 사용) = memberId
     public Authentication getAuthentication(String token) {
         UserDetails userDetails = userDetailsService.loadUserByUsername(getTokenUserId(token));
         return new UsernamePasswordAuthenticationToken(userDetails, token, userDetails.getAuthorities());
@@ -129,18 +121,5 @@ public class JwtTokenProvider implements InitializingBean {
             // 이런 저런 오류들이 발생해도 만료되어서 사용하지 못하는 것과 같으니까 그냥 다 만료인 것으로 간주해버리기
             return true;
         }
-    }
-
-    // 인증 이후 사용자 정보 -> 보안상 Credential null으로 저장하는 것이 유리함
-    public Authentication createAuthentication(Member member) {
-        Collection<? extends GrantedAuthority> authorities = getAuthorities(member);
-        return new UsernamePasswordAuthenticationToken(member, null, authorities);
-    }
-
-    //
-    private Collection<? extends GrantedAuthority> getAuthorities(Member member) {
-        return Collections.singletonList(
-                new SimpleGrantedAuthority("ROLE_" + member.getRole().name())
-        );
     }
 }
