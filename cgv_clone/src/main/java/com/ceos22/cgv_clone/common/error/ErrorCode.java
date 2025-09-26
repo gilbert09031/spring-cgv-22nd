@@ -12,9 +12,13 @@ public enum ErrorCode {
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "C001", "유효하지 않은 입력 값입니다."),
     INVALID_TYPE_VALUE(HttpStatus.BAD_REQUEST, "C002", "유효하지 않은 타입입니다."),
     INVALID_RUNNING_TIME(HttpStatus.BAD_REQUEST, "S001", "영화의 상영시간과 스케줄의 상영시간이 일치하지 않습니다."),
+    INVALID_TOKEN(HttpStatus.BAD_REQUEST, "J001", "유효하지 않은 토큰입니다."),
+    INVALID_PASSWORD(HttpStatus.BAD_REQUEST, "A005", "틀린 비밀번호입니다."),
 
     // 401 Unauthorized
     AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "A001", "인증에 실패했습니다."),
+    EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "J003", "만료된 토큰입니다."),
+    MISSING_TOKEN(HttpStatus.UNAUTHORIZED, "J004", "토큰이 필요합니다."),
 
     // 403 Forbidden
     AUTHORIZATION_FAILED(HttpStatus.FORBIDDEN, "A002", "권한이 없습니다."),
@@ -38,6 +42,7 @@ public enum ErrorCode {
     DUPLICATED_RESOURCE(HttpStatus.CONFLICT, "C008", "이미 존재하는 데이터입니다"),
     SCHEDULE_CONFLICT(HttpStatus.CONFLICT, "S002", "해당 시간에 이미 다른 스케줄이 존재합니다."),
     SEAT_ALREADY_RESERVED(HttpStatus.CONFLICT, "R001", "이미 예매된 좌석입니다."),
+    DUPLICATED_EMAIL(HttpStatus.CONFLICT, "A005", "이미 존재하는 이메일입니다."),
 
     // 500 Internal Server Error
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C007", "서버 내부 오류가 발생했습니다.");

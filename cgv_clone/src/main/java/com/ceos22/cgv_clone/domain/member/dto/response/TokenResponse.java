@@ -7,12 +7,9 @@ public record TokenResponse(
         String accessToken,
 
         @JsonProperty("refresh_token")
-        String refreshToken,
-
-        @JsonProperty("expires_in")
-        Long expiresIn
+        String refreshToken
 ) {
-    public static TokenResponse of(String accessToken, String refreshToken, Long expiresIn) {
-        return new TokenResponse(accessToken, refreshToken, expiresIn);
+    public static TokenResponse of(String accessToken, String refreshToken) {
+        return new TokenResponse(accessToken, refreshToken);
     }
 }

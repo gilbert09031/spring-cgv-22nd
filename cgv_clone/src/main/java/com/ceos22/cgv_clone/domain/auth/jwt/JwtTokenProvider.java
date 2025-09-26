@@ -1,5 +1,6 @@
 package com.ceos22.cgv_clone.domain.auth.jwt;
 
+import com.ceos22.cgv_clone.domain.member.entity.Member;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -11,11 +12,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.stream.Collectors;
 
@@ -26,15 +30,15 @@ public class JwtTokenProvider implements InitializingBean {
 
     @Value("${spring.jwt.secret}")
     private String secret;
-    @Value("${jwt.access-token-validity-in-seconds}")
+    @Value("${spring.jwt.token.access-expiration-time}")
     private Long accessTokenExpireTime;
-    @Value("${jwt.refresh-token-validity-in-seconds}")
+    @Value("${spring.jwt.token.refresh-expiration-time}")
     private Long refreshTokenExpireTime;
     private SecretKey key;
 
     private final UserDetailsService userDetailsService;
 
-    public static String AUTORIZATION_HEADER = "Authorization";
+    public static String AUTHORIZATION_HEADER = "Authorization";
     public static String TOKEN_PREFIX = "Bearer ";
 
     @Override
@@ -44,7 +48,7 @@ public class JwtTokenProvider implements InitializingBean {
     }
 
     public String getAccessToken(HttpServletRequest request) {
-        String accessToken = request.getHeader(AUTORIZATION_HEADER);
+        String accessToken = request.getHeader(AUTHORIZATION_HEADER);
         if(accessToken!=null && accessToken.startsWith(TOKEN_PREFIX)) {
             return accessToken.substring(TOKEN_PREFIX.length());
         }
@@ -82,12 +86,21 @@ public class JwtTokenProvider implements InitializingBean {
                 .getSubject();
     }
 
+    // userName -> memberId
     public Authentication getAuthentication(String token) {
         UserDetails userDetails = userDetailsService.loadUserByUsername(getTokenUserId(token));
-        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        return new UsernamePasswordAuthenticationToken(userDetails, token, userDetails.getAuthorities());
     }
 
-    public boolean validateAccessToken(String token) {
+    public Claims getClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    public boolean validateToken(String token) {
         try {
             Jwts.parser()
                     .verifyWith(key)
@@ -108,14 +121,6 @@ public class JwtTokenProvider implements InitializingBean {
         return false;
     }
 
-    public Claims getClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(key)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-    }
-
     public boolean isTokenExpired(String token) {
         try {
             Claims claims = getClaims(token);
@@ -124,5 +129,18 @@ public class JwtTokenProvider implements InitializingBean {
             // 이런 저런 오류들이 발생해도 만료되어서 사용하지 못하는 것과 같으니까 그냥 다 만료인 것으로 간주해버리기
             return true;
         }
+    }
+
+    // 인증 이후 사용자 정보 -> 보안상 Credential null으로 저장하는 것이 유리함
+    public Authentication createAuthentication(Member member) {
+        Collection<? extends GrantedAuthority> authorities = getAuthorities(member);
+        return new UsernamePasswordAuthenticationToken(member, null, authorities);
+    }
+
+    //
+    private Collection<? extends GrantedAuthority> getAuthorities(Member member) {
+        return Collections.singletonList(
+                new SimpleGrantedAuthority("ROLE_" + member.getRole().name())
+        );
     }
 }
