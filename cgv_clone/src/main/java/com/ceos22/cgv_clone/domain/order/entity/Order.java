@@ -1,11 +1,11 @@
 package com.ceos22.cgv_clone.domain.order.entity;
 
+import com.ceos22.cgv_clone.common.entity.BaseEntity;
 import com.ceos22.cgv_clone.domain.member.entity.Member;
 import com.ceos22.cgv_clone.domain.store.entity.Store;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class Order {
+public class Order extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,25 +38,9 @@ public class Order {
     @Builder.Default
     private OrderStatus orderStatus = OrderStatus.PENDING;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    private LocalDateTime updatedAt;
-
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<OrderDetail> orderDetails = new ArrayList<>();
-
-    @PrePersist
-    public void createdAt() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    public void updatedAt() {
-        this.updatedAt = LocalDateTime.now();
-    }
 
     public void addOrderDetail(OrderDetail orderDetail) {
         this.orderDetails.add(orderDetail);

@@ -31,6 +31,6 @@ public class Wish {
     private Theater theater;
 
     @Column(nullable = false)
-    @Enumerated
+    @Enumerated(EnumType.STRING)
     private WishType type; // 'MOVIE' 또는 'THEATER'
 }

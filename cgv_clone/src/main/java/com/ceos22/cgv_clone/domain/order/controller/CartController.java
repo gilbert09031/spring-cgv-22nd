@@ -38,7 +38,7 @@ public class CartController {
         return ApiResponse.success(SuccessCode.CREATE_SUCCESS, cart);
     }
 
-    @PutMapping("/{storeId}/items/{productId}")
+    @PatchMapping("/{storeId}/items/{productId}")
     public ResponseEntity<ApiResponse<CartResponse>> updateCartItem(
             @PathVariable Long storeId,
             @PathVariable Long productId,

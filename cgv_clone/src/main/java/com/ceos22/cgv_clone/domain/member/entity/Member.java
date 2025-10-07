@@ -1,5 +1,6 @@
 package com.ceos22.cgv_clone.domain.member.entity;
 
+import com.ceos22.cgv_clone.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -7,7 +8,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.Collections;
 
@@ -16,7 +16,7 @@ import java.util.Collections;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
 @Builder
-public class Member implements UserDetails {
+public class Member extends BaseEntity implements UserDetails {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -39,9 +39,6 @@ public class Member implements UserDetails {
     @Builder.Default
     private Role role = Role.USER;
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
     // UserDetails 구현
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -51,16 +48,5 @@ public class Member implements UserDetails {
     @Override
     public String getUsername() {
         return String.valueOf(memberId);
-    }
-
-    @PrePersist
-    public void prePersist() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }

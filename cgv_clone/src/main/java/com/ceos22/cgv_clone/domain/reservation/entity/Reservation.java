@@ -1,17 +1,17 @@
 package com.ceos22.cgv_clone.domain.reservation.entity;
 
+import com.ceos22.cgv_clone.common.entity.BaseEntity;
 import com.ceos22.cgv_clone.domain.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Reservation {
+public class Reservation extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,16 +33,8 @@ public class Reservation {
     @Column(nullable = false)
     private ReservationStatus status;
 
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
     @OneToMany(mappedBy = "reservation", cascade = CascadeType.ALL)
     private List<ReservationSeat> reservationSeats = new ArrayList<>();
-
-    @PrePersist
-    public void setCreatedAt() {
-        this.createdAt = LocalDateTime.now();
-    }
 
     @Builder(access = AccessLevel.PRIVATE)
     public Reservation(Member member, Schedule schedule, Integer totalPrice) {
@@ -50,7 +42,6 @@ public class Reservation {
         this.schedule = schedule;
         this.totalPrice = totalPrice;
         this.status = ReservationStatus.CONFIRMED;
-        this.createdAt = LocalDateTime.now();
     }
 
     public static Reservation create(Member member, Schedule schedule, Integer totalPrice) {
