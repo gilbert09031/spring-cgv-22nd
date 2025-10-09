@@ -11,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 import java.io.IOException;
 
@@ -20,6 +21,8 @@ import java.io.IOException;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    // Filter에서 발생하는 Error를 GlobalExceptionHandler으로 위임
+    private final HandlerExceptionResolver handlerExceptionResolver;
 
     @Override
     protected void doFilterInternal(
@@ -28,19 +31,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String token = jwtTokenProvider.getAccessToken(request);
+        try {
+            String token = jwtTokenProvider.getAccessToken(request);
 
-        if (token != null && !token.isEmpty() && jwtTokenProvider.validateToken(token)) {
-            try {
+            if(token != null && !token.isEmpty()) {
+                jwtTokenProvider.validateToken(token);
+
                 Authentication authentication = jwtTokenProvider.getAuthentication(token);
                 SecurityContextHolder.getContext().setAuthentication(authentication);
-                log.info("Authentication success: {}", authentication);
-            } catch (Exception e) {
-                SecurityContextHolder.clearContext();
             }
+            filterChain.doFilter(request, response);
+        } catch (Exception e) {
+            SecurityContextHolder.clearContext();
+            handlerExceptionResolver.resolveException(request, response, null, e);
         }
-        filterChain.doFilter(request, response);
     }
-
-
 }

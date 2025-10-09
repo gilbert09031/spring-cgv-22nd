@@ -1,5 +1,9 @@
 package com.ceos22.cgv_clone.domain.auth.jwt;
 
+import com.ceos22.cgv_clone.domain.auth.jwt.error.ExpiredTokenException;
+import com.ceos22.cgv_clone.domain.auth.jwt.error.InvalidTokenException;
+import com.ceos22.cgv_clone.domain.auth.jwt.error.MalformedTokenException;
+import com.ceos22.cgv_clone.domain.auth.jwt.error.UnsupportedTokenException;
 import com.ceos22.cgv_clone.domain.member.entity.Member;
 import com.ceos22.cgv_clone.domain.member.entity.Role;
 import io.jsonwebtoken.*;
@@ -30,6 +34,7 @@ public class JwtTokenProvider implements InitializingBean {
     private Long accessTokenExpireTime;
     @Value("${spring.jwt.token.refresh-expiration-time}")
     private Long refreshTokenExpireTime;
+
     private SecretKey key;
 
     private final UserDetailsService userDetailsService;
@@ -78,10 +83,13 @@ public class JwtTokenProvider implements InitializingBean {
                 .getSubject();
     }
 
-    // userName(jwt에서 사용자를 구분하기 위해 사용) = memberId
+    /**
+     * 토큰에서 Authentication 객체 생성
+     * 이후 credential은 사용하지 않아 null으로 생성
+     */
     public Authentication getAuthentication(String token) {
         UserDetails userDetails = userDetailsService.loadUserByUsername(getTokenUserId(token));
-        return new UsernamePasswordAuthenticationToken(userDetails, token, userDetails.getAuthorities());
+        return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
     }
 
     public Claims getClaims(String token) {
@@ -92,25 +100,23 @@ public class JwtTokenProvider implements InitializingBean {
                 .getPayload();
     }
 
-    public boolean validateToken(String token) {
+    public void validateToken(String token) {
         try {
             Jwts.parser()
                     .verifyWith(key)
                     .build()
                     .parseSignedClaims(token);
-            return true;
         } catch (ExpiredJwtException e) {
-            log.error("JWT 토큰이 만료되었습니다: {}", e.getMessage());
+            throw new ExpiredTokenException("토큰이 만료되었습니다.");
         } catch (UnsupportedJwtException e) {
-            log.error("지원되지 않는 JWT 토큰입니다: {}", e.getMessage());
+            throw new UnsupportedTokenException("지원되지 않는 토큰 형식입니다.");
         } catch (MalformedJwtException e) {
-            log.error("잘못된 JWT 토큰입니다: {}", e.getMessage());
+            throw new MalformedTokenException("잘못된 토큰 형식입니다.");
         } catch (JwtException e) {
-            log.error("JWT 토큰 서명 검증에 실패했습니다: {}", e.getMessage());
+            throw new InvalidTokenException("유효하지 않은 토큰입니다.");
         } catch (IllegalArgumentException e) {
-            log.error("JWT 토큰이 null이거나 빈 문자열입니다: {}", e.getMessage());
+            throw new InvalidTokenException("토큰이 비어있습니다.");
         }
-        return false;
     }
 
     public boolean isTokenExpired(String token) {
