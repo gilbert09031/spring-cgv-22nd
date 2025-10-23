@@ -12,6 +12,8 @@ public record MemberInfoResponse(
 
         String email,
 
+        String name,
+
         @JsonProperty("birth_date")
         LocalDate birthDate,
 
@@ -20,8 +22,9 @@ public record MemberInfoResponse(
     public static MemberInfoResponse from(Member member) {
         return new MemberInfoResponse(
                 member.getMemberId(),
-                member.getEmail(),
-                member.getBirthDate(),
+                member.getEmail().getValue(),
+                member.getName().getValue(),
+                member.getBirthDate().getValue(),
                 member.getRole()
         );
     }

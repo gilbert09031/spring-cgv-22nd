@@ -32,7 +32,7 @@ public class OrderController {
     }
 
 
-    @GetMapping
+    @GetMapping// Paging 추가하기
     public ResponseEntity<ApiResponse<List<OrderResponse>>> getMyOrders(
             @AuthenticationPrincipal Member member
     ) {

@@ -26,6 +26,7 @@ public enum ErrorCode {
     MISSING_TOKEN(HttpStatus.UNAUTHORIZED, "J004", "토큰이 필요합니다."),
     UNSUPPORTED_TOKEN(HttpStatus.UNAUTHORIZED, "J005", "지원하지 않는 토큰 형식입니다."),
     MALFORMED_TOKEN(HttpStatus.UNAUTHORIZED, "J006", "잘못된 형식의 토큰입니다."),
+    BLACKLISTED_TOKEN(HttpStatus.UNAUTHORIZED, "J007", "로그아웃된 토큰입니다."),
 
     // 403 Forbidden
     AUTHORIZATION_FAILED(HttpStatus.FORBIDDEN, "A002", "권한이 없습니다."),

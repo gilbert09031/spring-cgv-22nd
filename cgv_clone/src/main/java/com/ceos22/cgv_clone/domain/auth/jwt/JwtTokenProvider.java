@@ -128,4 +128,10 @@ public class JwtTokenProvider implements InitializingBean {
             return true;
         }
     }
+
+    public long getExpiration(String token) {
+        Date expiration = getClaims(token).getExpiration();
+        long now = new Date().getTime();
+        return expiration.getTime() - now;
+    }
 }

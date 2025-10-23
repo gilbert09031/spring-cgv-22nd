@@ -4,6 +4,7 @@ import com.ceos22.cgv_clone.common.error.SuccessCode;
 import com.ceos22.cgv_clone.common.response.ApiResponse;
 import com.ceos22.cgv_clone.domain.auth.service.AuthService;
 import com.ceos22.cgv_clone.domain.member.dto.request.LoginRequest;
+import com.ceos22.cgv_clone.domain.member.dto.request.LogoutRequest;
 import com.ceos22.cgv_clone.domain.member.dto.request.RefreshTokenRequest;
 import com.ceos22.cgv_clone.domain.member.dto.request.SignUpRequest;
 import com.ceos22.cgv_clone.domain.member.dto.response.MemberInfoResponse;
@@ -45,8 +46,10 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<Void>> logout() {
-        authService.logout();
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @Valid @RequestBody LogoutRequest request
+    ) {
+        authService.logout(request.accessToken());
         return ApiResponse.success(SuccessCode.LOGOUT_SUCCESS);
     }
 }

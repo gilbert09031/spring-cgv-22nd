@@ -1,5 +1,7 @@
 package com.ceos22.cgv_clone.domain.auth.jwt;
 
+import com.ceos22.cgv_clone.domain.auth.jwt.error.BlacklistedTokenException;
+import com.ceos22.cgv_clone.domain.auth.service.RedisService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +25,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
     // Filter에서 발생하는 Error를 GlobalExceptionHandler으로 위임
     private final HandlerExceptionResolver handlerExceptionResolver;
+    private final RedisService redisService;
+
+    private static final String BlACKLIST_PREFIX = "BL:";
 
     @Override
     protected void doFilterInternal(
@@ -35,6 +40,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = jwtTokenProvider.getAccessToken(request);
 
             if(token != null && !token.isEmpty()) {
+                String blackListKey = BlACKLIST_PREFIX + token;
+                if (redisService.hasKey(blackListKey)) {
+                    SecurityContextHolder.clearContext();
+                    throw new BlacklistedTokenException();
+                }
+
                 jwtTokenProvider.validateToken(token);
 
                 Authentication authentication = jwtTokenProvider.getAuthentication(token);

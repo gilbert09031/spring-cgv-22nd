@@ -1,13 +1,14 @@
 package com.ceos22.cgv_clone.domain.member.dto.request;
 
+import com.ceos22.cgv_clone.domain.member.vo.BirthDate;
+import com.ceos22.cgv_clone.domain.member.vo.Email;
+import com.ceos22.cgv_clone.domain.member.vo.MemberName;
 import jakarta.validation.constraints.*;
 
 import java.time.LocalDate;
 
-
 public record SignUpRequest(
         @NotBlank(message = "이메일은 필수입니다.")
-        @Email(message = "올바른 이메일 형식이 아닙니다.")
         String email,
 
         @NotBlank(message = "비밀번호는 필수입니다.")
@@ -19,4 +20,15 @@ public record SignUpRequest(
         @NotNull(message = "생년월일은 필수입니다.")
         LocalDate birthDate
 ) {
+        public Email toEmail() {
+                return Email.from(this.email);
+        }
+
+        public MemberName toName() {
+                return MemberName.from(this.name);
+        }
+
+        public BirthDate toBirthDate() {
+                return BirthDate.from(this.birthDate);
+        }
 }
