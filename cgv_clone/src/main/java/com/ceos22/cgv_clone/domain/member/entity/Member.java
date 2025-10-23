@@ -50,7 +50,7 @@ public class Member extends BaseEntity implements UserDetails {
         this.role = role;
     }
 
-    public static Member create(
+    public static Member of(
             String email,
             String rawPassword,
             String name,

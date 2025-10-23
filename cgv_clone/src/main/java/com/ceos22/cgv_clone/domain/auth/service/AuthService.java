@@ -42,7 +42,7 @@ public class AuthService {
         Email email = request.toEmail();
         validateDuplicateEmail(email);
 
-        Member member = Member.create(
+        Member member = Member.of(
                 request.email(),
                 request.password(),
                 request.name(),
