@@ -35,89 +35,27 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(Long memberId, OrderCreateRequest request) {
 
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = findMemberById(memberId);
+        Store store = findStoreById(request.storeId());
 
-        Store store = storeRepository.findById(request.storeId())
-                .orElseThrow(() -> new CustomException(ErrorCode.STORE_NOT_FOUND));
+        Order cart = getCart(member, store);
 
-        List<Order> pendingOrders = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.PENDING)
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
-
-        Order cart = pendingOrders.stream()
-                .filter(order -> order.getStore().getStoreId().equals(store.getStoreId()))
-                .findFirst()
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
-
-        if (cart.getOrderDetails().isEmpty()) {
-            throw new CustomException(ErrorCode.CART_EMPTY);
-        }
-
-        for (OrderDetail detail : cart.getOrderDetails()) {
-            try {
-                storeService.decreaseStock(
-                        store.getStoreId(),
-                        detail.getProduct().getProductId(),
-                        detail.getQuantity()
-                );
-            } catch (Exception e) {
-                throw new CustomException(ErrorCode.INSUFFICIENT_STOCK);
-            }
-        }
+        validateCartNotEmpty(cart);
+        decreaseStockForOrder(cart);
 
         cart.confirmOrder();
 
         return OrderResponse.from(cart);
     }
 
-
-    @Transactional
-    public void cancelOrder(Long memberId, Long orderId) {
-
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
-
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
-
-        if (!order.getMember().getMemberId().equals(member.getMemberId())) {
-            throw new CustomException(ErrorCode.AUTHORIZATION_FAILED);
-        }
-
-        if (order.getOrderStatus() == OrderStatus.CANCELLED) {
-            throw new CustomException(ErrorCode.ORDER_ALREADY_CANCELLED);
-        }
-
-        if (order.getOrderStatus() == OrderStatus.COMPLETED) {
-            throw new CustomException(ErrorCode.ORDER_ALREADY_COMPLETED);
-        }
-
-        for (OrderDetail detail : order.getOrderDetails()) {
-            try {
-                storeService.increaseStock(
-                        order.getStore().getStoreId(),
-                        detail.getProduct().getProductId(),
-                        detail.getQuantity()
-                );
-            } catch (Exception e) {
-                log.error("재고 복구 실패: 상품ID={}, 수량={}, 오류={}",
-                        detail.getProduct().getProductId(), detail.getQuantity(), e.getMessage());
-                // 재고 복구를 위한 로깅
-            }
-        }
-        order.cancelOrder();
-    }
-
-
     public List<OrderResponse> getMyOrders(Long memberId) {
 
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = findMemberById(memberId);
 
         List<Order> allOrders = orderRepository.findByMember(member);
 
         List<Order> orders = allOrders.stream()
-                .filter(order -> order.getOrderStatus() != OrderStatus.PENDING)
+                .filter(order -> order.getStatus() != OrderStatus.CART)
                 .collect(Collectors.toList());
 
         return orders.stream()
@@ -127,30 +65,84 @@ public class OrderService {
 
     public OrderResponse getOrderDetail(Long memberId, Long orderId) {
 
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = findMemberById(memberId);
+        Order order = findOrderById(orderId);
 
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
-
-        if (!order.getMember().getMemberId().equals(member.getMemberId())) {
-            throw new CustomException(ErrorCode.AUTHORIZATION_FAILED);
-        }
-
-        if (order.getOrderStatus() == OrderStatus.PENDING) {
-            throw new CustomException(ErrorCode.ORDER_NOT_FOUND);
-        }
+        validateOrderOwner(order, member);
+        validateOrderNotCart(order);
 
         return OrderResponse.from(order);
     }
 
-
     @Transactional
     public void completeOrder(Long orderId) {
 
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
-
+        Order order = findOrderById(orderId);
         order.completeOrder();
+    }
+
+    //=================================================================================================================
+    private Member findMemberById(Long memberId) {
+        return memberRepository.findById(memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+    }
+
+    private Store findStoreById(Long storeId) {
+        return storeRepository.findById(storeId)
+                .orElseThrow(() -> new CustomException(ErrorCode.STORE_NOT_FOUND));
+    }
+
+    private Order findOrderById(Long orderId) {
+        return orderRepository.findById(orderId)
+                .orElseThrow(() -> new CustomException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
+    private Order getCart(Member member, Store store) {
+        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.CART)
+                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
+
+        return carts.stream()
+                .filter(order -> order.getStore().getStoreId().equals(store.getStoreId()))
+                .findFirst()
+                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
+    }
+    //=================================================================================================================
+    private void validateCartNotEmpty(Order cart) {
+        if (cart.getOrderDetails().isEmpty()) {
+            throw new CustomException(ErrorCode.CART_EMPTY);
+        }
+    }
+
+    private void validateOrderOwner(Order order, Member member) {
+        if (!order.getMember().getMemberId().equals(member.getMemberId())) {
+            throw new CustomException(ErrorCode.AUTHORIZATION_FAILED);
+        }
+    }
+
+    private void validateOrderNotCompleted(Order order) {
+        if (order.getStatus() == OrderStatus.COMPLETED) {
+            throw new CustomException(ErrorCode.ORDER_ALREADY_COMPLETED);
+        }
+    }
+
+    private void validateOrderNotCart(Order order) {
+        if (order.getStatus() == OrderStatus.CART) {
+            throw new CustomException(ErrorCode.ORDER_NOT_FOUND);
+        }
+    }
+
+    //=================================================================================================================
+    private void decreaseStockForOrder(Order cart) {
+        for (OrderDetail detail : cart.getOrderDetails()) {
+            try {
+                storeService.decreaseStock(
+                        cart.getStore().getStoreId(),
+                        detail.getProduct().getProductId(),
+                        detail.getQuantity()
+                );
+            } catch (Exception e) {
+                throw new CustomException(ErrorCode.INSUFFICIENT_STOCK);
+            }
+        }
     }
 }

@@ -21,7 +21,6 @@ public class OrderController {
 
     private final OrderService orderService;
 
-
     @PostMapping
     public ResponseEntity<ApiResponse<OrderResponse>> createOrder(
             @Valid @RequestBody OrderCreateRequest request,
@@ -47,14 +46,5 @@ public class OrderController {
     ) {
         OrderResponse order = orderService.getOrderDetail(member.getMemberId(), orderId);
         return ApiResponse.success(SuccessCode.GET_SUCCESS, order);
-    }
-
-    @PutMapping("/{orderId}/cancel")
-    public ResponseEntity<ApiResponse<Void>> cancelOrder(
-            @PathVariable Long orderId,
-            @AuthenticationPrincipal Member member
-    ) {
-        orderService.cancelOrder(member.getMemberId(), orderId);
-        return ApiResponse.success(SuccessCode.UPDATE_SUCCESS);
     }
 }

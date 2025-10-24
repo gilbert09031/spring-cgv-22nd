@@ -25,7 +25,7 @@ public record OrderResponse(
                 order.getOrderId(),
                 order.getStore().getStoreId(),
                 order.getStore().getStoreType(),
-                order.getOrderStatus(),
+                order.getStatus(),
                 order.getTotalPrice(),
                 order.getCreatedAt(),
                 items

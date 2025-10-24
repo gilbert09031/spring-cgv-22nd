@@ -7,7 +7,6 @@ import com.ceos22.cgv_clone.domain.member.repository.MemberRepository;
 import com.ceos22.cgv_clone.domain.order.dto.request.CartItemRequest;
 import com.ceos22.cgv_clone.domain.order.dto.response.CartResponse;
 import com.ceos22.cgv_clone.domain.order.entity.Order;
-import com.ceos22.cgv_clone.domain.order.entity.OrderDetail;
 import com.ceos22.cgv_clone.domain.order.entity.OrderStatus;
 import com.ceos22.cgv_clone.domain.order.repository.OrderRepository;
 import com.ceos22.cgv_clone.domain.store.entity.Product;
@@ -33,19 +32,10 @@ public class CartService {
     private final StoreStockRepository storeStockRepository;
 
     public CartResponse getCart(Long memberId, Long storeId) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = findMemberById(memberId);
+        Store store = findStoreById(storeId);
 
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STORE_NOT_FOUND));
-
-        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.PENDING)
-                .orElse(List.of());
-
-        Order cart = carts.stream()
-                .filter(order -> order.getStore().equals(store))
-                .findFirst()
-                .orElse(null);
+        Order cart = findCartByMemberAndStore(member, store);
 
         if (cart == null) {
             return new CartResponse(null, storeId, store.getStoreType(), 0, List.of());
@@ -56,32 +46,14 @@ public class CartService {
     @Transactional
     public CartResponse addToCart(Long memberId, CartItemRequest request) {
 
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = findMemberById(memberId);
+        Store store = findStoreById(request.storeId());
+        Product product = findProductById(request.productId());
 
-        Store store = storeRepository.findById(request.storeId())
-                .orElseThrow(() -> new CustomException(ErrorCode.STORE_NOT_FOUND));
+        validateStock(store, product, request.quantity());
 
-        Product product = productRepository.findById(request.productId())
-                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
-
-        if (!storeStockRepository.existsOrderableStock(store, product, request.quantity())) {
-            throw new CustomException(ErrorCode.INSUFFICIENT_STOCK);
-        }
-
-        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.PENDING)
-                .orElse(List.of());
-
-        Order cart = carts.stream()
-                .filter(order -> order.getStore().equals(store))
-                .findFirst()
-                .orElseGet(() -> {
-                    Order newCart = Order.of(member, store);
-                    return orderRepository.save(newCart);
-                });
-
-        OrderDetail orderDetail = OrderDetail.of(product, request.quantity());
-        cart.addToCart(orderDetail);
+        Order cart = findOrCreateCart(member, store);
+        cart.addToCart(product, request.quantity());
 
         return CartResponse.from(cart);
     }
@@ -89,27 +61,13 @@ public class CartService {
     @Transactional
     public CartResponse updateCartItem(Long memberId, Long storeId, Long productId, Integer newQuantity) {
 
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = findMemberById(memberId);
+        Store store = findStoreById(storeId);
+        Product product = findProductById(productId);
 
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STORE_NOT_FOUND));
+        validateStock(store, product, newQuantity);
 
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
-
-        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.PENDING)
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
-
-        Order cart = carts.stream()
-                .filter(order -> order.getStore().equals(store))
-                .findFirst()
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
-
-        if (!storeStockRepository.existsOrderableStock(store, product, newQuantity)) {
-            throw new CustomException(ErrorCode.INSUFFICIENT_STOCK);
-        }
-
+        Order cart = getExistingCart(member, store);
         cart.updateCartItemQuantity(productId, newQuantity);
 
         return CartResponse.from(cart);
@@ -118,21 +76,10 @@ public class CartService {
     @Transactional
     public CartResponse removeFromCart(Long memberId, Long storeId, Long productId) {
 
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+        Member member = findMemberById(memberId);
+        Store store = findStoreById(storeId);
 
-        Store store = storeRepository.findById(storeId)
-                .orElseThrow(() -> new CustomException(ErrorCode.STORE_NOT_FOUND));
-
-        // 장바구니 조회
-        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.PENDING)
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
-
-        Order cart = carts.stream()
-                .filter(order -> order.getStore().equals(store))
-                .findFirst()
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
-
+        Order cart = getExistingCart(member, store);
         cart.removeFromCart(productId);
 
         return CartResponse.from(cart);
@@ -141,20 +88,63 @@ public class CartService {
     @Transactional
     public void clearCart(Long memberId, Long storeId) {
 
-        Member member = memberRepository.findById(memberId)
+        Member member = findMemberById(memberId);
+        Store store = findStoreById(storeId);
+
+        Order cart = getExistingCart(member, store);
+        cart.clearCart();
+    }
+
+    //==================================================================================================================
+    private Member findMemberById(Long memberId) {
+        return memberRepository.findById(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+    }
 
-        Store store = storeRepository.findById(storeId)
+    private Store findStoreById(Long storeId) {
+        return storeRepository.findById(storeId)
                 .orElseThrow(() -> new CustomException(ErrorCode.STORE_NOT_FOUND));
+    }
 
-        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.PENDING)
+    private Product findProductById(Long productId) {
+        return productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+    }
+
+    private Order findCartByMemberAndStore(Member member, Store store) {
+        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.CART)
+                .orElse(List.of());
+
+        return carts.stream()
+                .filter(order -> order.getStore().equals(store))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private Order findOrCreateCart(Member member, Store store) {
+        Order cart = findCartByMemberAndStore(member, store);
+
+        if(cart == null) {
+            cart = Order.of(member, store);
+            return orderRepository.save(cart);
+        }
+
+        return cart;
+    }
+
+    private Order getExistingCart(Member member, Store store) {
+        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.CART)
                 .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
 
-        Order cart = carts.stream()
+        return carts.stream()
                 .filter(order -> order.getStore().equals(store))
                 .findFirst()
                 .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
+    }
 
-        cart.clearCart();
+    private void validateStock(Store store, Product product, int quantity) {
+        if(!storeStockRepository.existsOrderableStock(store, product, quantity)) {
+            throw new CustomException(ErrorCode.INSUFFICIENT_STOCK);
+        }
     }
 }

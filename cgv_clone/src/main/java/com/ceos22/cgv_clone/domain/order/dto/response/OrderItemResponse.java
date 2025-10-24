@@ -15,7 +15,7 @@ public record OrderItemResponse(
                 orderDetail.getOrderDetailId(),
                 orderDetail.getProduct().getProductId(),
                 orderDetail.getProduct().getName(),
-                orderDetail.getPriceAtPurchase(),
+                orderDetail.getProduct().getPrice(),
                 orderDetail.getQuantity(),
                 orderDetail.getSubtotal()
         );

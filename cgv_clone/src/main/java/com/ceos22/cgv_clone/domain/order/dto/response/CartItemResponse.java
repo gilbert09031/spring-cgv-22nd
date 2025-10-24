@@ -16,7 +16,7 @@ public record CartItemResponse(
                 orderDetail.getOrderDetailId(),
                 orderDetail.getProduct().getProductId(),
                 orderDetail.getProduct().getName(),
-                orderDetail.getPriceAtPurchase(),
+                orderDetail.getProduct().getPrice(),
                 orderDetail.getProduct().getImageUrl(),
                 orderDetail.getQuantity(),
                 orderDetail.getSubtotal()

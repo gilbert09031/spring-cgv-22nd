@@ -14,7 +14,7 @@ public record CartResponse(
         List<CartItemResponse> items
 ) {
     public static CartResponse from(Order cart) {
-        if (!cart.getOrderStatus().equals(OrderStatus.PENDING)) {
+        if (!cart.getStatus().equals(OrderStatus.CART)) {
             throw new IllegalArgumentException("장바구니 상태가 아닙니다.");
         }
 
