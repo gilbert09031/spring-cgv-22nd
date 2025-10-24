@@ -2,6 +2,7 @@ package com.ceos22.cgv_clone.domain.order.entity;
 
 import com.ceos22.cgv_clone.common.entity.BaseEntity;
 import com.ceos22.cgv_clone.domain.member.entity.Member;
+import com.ceos22.cgv_clone.domain.store.entity.Product;
 import com.ceos22.cgv_clone.domain.store.entity.Store;
 import jakarta.persistence.*;
 import lombok.*;
@@ -13,8 +14,6 @@ import java.util.List;
 @Table(name = "orders") // DB 키워드인 ORDER와 겹치지 않게 테이블 이름 명시
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
-@Builder
 public class Order extends BaseEntity {
 
     @Id
@@ -30,124 +29,129 @@ public class Order extends BaseEntity {
     private Store store;
 
     @Column(nullable = false)
-    @Builder.Default
-    private Integer totalPrice = 0;
+    private Integer totalPrice;
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
-    @Builder.Default
-    private OrderStatus orderStatus = OrderStatus.PENDING;
+    private OrderStatus status;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
     private List<OrderDetail> orderDetails = new ArrayList<>();
 
+    private Order(Member member, Store store) {
+        this.member = member;
+        this.store = store;
+        this.status = OrderStatus.CART;
+        this.totalPrice = 0;
+    }
+
+    public static Order of(Member member, Store store) {
+        return new Order(member, store);
+    }
+    //==================================================================================================================
     public void addOrderDetail(OrderDetail orderDetail) {
         this.orderDetails.add(orderDetail);
         orderDetail.setOrder(this);
-        this.calculateTotalPrice();
+        calculateTotalPrice();
     }
 
     public void removeOrderDetail(OrderDetail orderDetail) {
         this.orderDetails.remove(orderDetail);
         orderDetail.setOrder(null);
-        this.calculateTotalPrice();
+        calculateTotalPrice();
     }
 
-    public void calculateTotalPrice() {
+    private void calculateTotalPrice() {
         this.totalPrice = orderDetails.stream()
                 .mapToInt(OrderDetail::getSubtotal)
                 .sum();
     }
+    //=====================장바구니======================================================================================
 
-    public void cancelOrder() {
-        if(this.orderStatus == OrderStatus.COMPLETED) {
-            throw new IllegalStateException("완료된 주문은 취소할 수 없습니다");
-        }
-        if(this.orderStatus == OrderStatus.CANCELLED) {
-            throw new IllegalStateException("이미 취소된 주문입니다");
-        }
-        this.orderStatus = OrderStatus.CANCELLED;
-    }
+    public void addToCart(Product product, Integer quantity) {
+        validateCartStatus();
 
-    public void completeOrder() {
-        if(this.orderStatus != OrderStatus.CONFIRMED) {
-            throw new IllegalStateException("이미 완료된 주문입니다.");
-        }
-        this.orderStatus = OrderStatus.COMPLETED;
-    }
-
-    // 장바구니 관련
-    public void confirmOrder() {
-        if (this.orderStatus != OrderStatus.PENDING) {
-            throw new IllegalStateException("장바구니 상태에서만 주문이 가능합니다.");
-        }
-        if (this.orderDetails.isEmpty()) {
-            throw new IllegalStateException("빈 장바구니는 주문할 수 없습니다.");
-        }
-        this.orderStatus = OrderStatus.CONFIRMED;
-    }
-
-    public void addToCart(OrderDetail newOrderDetail) {
-        if (this.orderStatus != OrderStatus.PENDING) {
-            throw new IllegalStateException("장바구니 상태가 아닙니다.");
-        }
-
-        OrderDetail existingDetail = this.orderDetails.stream()
-                .filter(detail -> detail.getProduct().equals(newOrderDetail.getProduct()))
-                .findFirst()
-                .orElse(null);
+        OrderDetail existingDetail = findOrderDetailsByProduct(product);
 
         if (existingDetail != null) {
-            // 기존 상품이 있으면 수량 증가
-            existingDetail.changeQuantity(existingDetail.getQuantity() + newOrderDetail.getQuantity());
+            existingDetail.changeQuantity(existingDetail.getQuantity() + quantity);
+            calculateTotalPrice();
         } else {
-            // 새 상품이면 추가
-            this.addOrderDetail(newOrderDetail);
+            OrderDetail newOrderDetail = OrderDetail.of(product, quantity);
+            addOrderDetail(newOrderDetail);
         }
     }
 
     public void removeFromCart(Long productId) {
-        if (this.orderStatus != OrderStatus.PENDING) {
-            throw new IllegalStateException("장바구니 상태에서만 삭제가 가능합니다.");
+        validateCartStatus();
+
+        OrderDetail orderDetail = findOrderDetailsByProductId(productId);
+        if (orderDetail == null) {
+            throw new IllegalArgumentException("장바구니에 해당 상품 없음");
         }
-
-        OrderDetail removeDetail = this.orderDetails.stream()
-                .filter(detail -> detail.getProduct().getProductId().equals(productId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("해당 상품이 장바구니에 없습니다."));
-
-        this.removeOrderDetail(removeDetail);
+        removeOrderDetail(orderDetail);
     }
 
-    public void updateCartItemQuantity(Long productId, int newQuantity) {
-        if (this.orderStatus != OrderStatus.PENDING) {
-            throw new IllegalStateException("장바구니 상태에서만 수량 변경이 가능합니다.");
+    public void updateCartItemQuantity(Long productId, Integer quantity) {
+        validateCartStatus();
+
+        OrderDetail orderDetail = findOrderDetailsByProductId(productId);
+        if (orderDetail == null) {
+            throw new IllegalArgumentException("장바구니에 해당 상품 없음");
         }
 
-        OrderDetail orderDetail = this.orderDetails.stream()
-                .filter(detail -> detail.getProduct().getProductId().equals(productId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("해당 상품이 장바구니에 없습니다."));
-
-        orderDetail.changeQuantity(newQuantity);
-        this.calculateTotalPrice();
+        orderDetail.changeQuantity(quantity);
+        calculateTotalPrice();
     }
 
     public void clearCart() {
-        if (this.orderStatus != OrderStatus.PENDING) {
-            throw new IllegalStateException("장바구니 상태에서만 비울 수 있습니다.");
-        }
-        this.orderDetails.clear();
-        this.calculateTotalPrice();
+        validateCartStatus();
+        orderDetails.clear();
+        calculateTotalPrice();
+    }
+    // ================================================================================================================
+    public void confirmOrder() {
+        validateCartStatus();
+        validateCartNotEmpty();
+        this.status = OrderStatus.CONFIRMED;
     }
 
-    public static Order of(Member member, Store store) {
-        return Order.builder()
-                .member(member)
-                .store(store)
-                .totalPrice(0)
-                .orderStatus(OrderStatus.PENDING)
-                .build();
+    public void completeOrder() {
+        validateConfirmedStatus();
+        this.status = OrderStatus.COMPLETED;
+    }
+
+    // ================================================================================================================
+
+    private OrderDetail findOrderDetailsByProduct(Product product) {
+        return orderDetails.stream()
+                .filter(detail -> detail.getProduct().equals(product))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private OrderDetail findOrderDetailsByProductId(Long productId) {
+        return orderDetails.stream()
+                .filter(detail -> detail.getProduct().getProductId().equals(productId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void validateCartStatus() {
+        if(this.status != OrderStatus.CART) {
+            throw new IllegalStateException("장바구니 상태가 아닙니다");
+        }
+    }
+
+    private void validateConfirmedStatus() {
+        if(this.status != OrderStatus.CONFIRMED) {
+            throw new IllegalArgumentException("주문완료 상태가 아닙니다");
+        }
+    }
+
+    private void validateCartNotEmpty() {
+        if(orderDetails.isEmpty()){
+            throw new IllegalStateException("장바구니가 비어있습니다.");
+        }
     }
 }

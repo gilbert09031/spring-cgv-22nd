@@ -7,8 +7,6 @@ import lombok.*;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
-@Builder
 public class OrderDetail {
 
     @Id
@@ -17,7 +15,6 @@ public class OrderDetail {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id", nullable = false)
-    @Setter
     private Order order;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -28,26 +25,35 @@ public class OrderDetail {
     private Integer quantity; // 주문 수량
 
     @Column(nullable = false)
-    private Integer priceAtPurchase; // 주문 시점의 상품 가격
+    private Integer price;
+
+    private OrderDetail(Product product, Integer quantity) {
+        validateQuantity(quantity);
+        this.product = product;
+        this.quantity = quantity;
+        this.price = product.getPrice();
+    }
+
+    public static OrderDetail of(Product product, Integer quantity) {
+        return new OrderDetail(product, quantity);
+    }
 
     public Integer getSubtotal() {
-        return quantity * priceAtPurchase;
+        return price * quantity;
     }
 
     public void changeQuantity(Integer quantity) {
-        if (quantity <= 0){
-            throw new IllegalArgumentException("0개 이상으로만 변경 할 수 있습니다");
-        }
+        validateQuantity(quantity);
         this.quantity = quantity;
     }
 
+    private void validateQuantity(Integer quantity) {
+        if(quantity == null || quantity <= 0) {
+            throw new IllegalArgumentException("수량은 1 이상");
+        }
+    }
 
-
-    public static OrderDetail of(Product product, int quantity) {
-        return OrderDetail.builder()
-                .product(product)
-                .quantity(quantity)
-                .priceAtPurchase(product.getPrice()) // 현재 상품 가격으로 설정
-                .build();
+    void setOrder(Order order) {
+        this.order = order;
     }
 }
