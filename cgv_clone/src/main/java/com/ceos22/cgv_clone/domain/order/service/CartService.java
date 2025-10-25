@@ -18,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -38,14 +39,13 @@ public class CartService {
         Order cart = findCartByMemberAndStore(member, store);
 
         if (cart == null) {
-            return new CartResponse(null, storeId, store.getStoreType(), 0, List.of());
+            return new CartResponse(null, storeId, store.getStoreType(), 0, Collections.emptyList());
         }
         return CartResponse.from(cart);
     }
 
     @Transactional
     public CartResponse addToCart(Long memberId, CartItemRequest request) {
-
         Member member = findMemberById(memberId);
         Store store = findStoreById(request.storeId());
         Product product = findProductById(request.productId());
@@ -60,7 +60,6 @@ public class CartService {
 
     @Transactional
     public CartResponse updateCartItem(Long memberId, Long storeId, Long productId, Integer newQuantity) {
-
         Member member = findMemberById(memberId);
         Store store = findStoreById(storeId);
         Product product = findProductById(productId);
@@ -75,7 +74,6 @@ public class CartService {
 
     @Transactional
     public CartResponse removeFromCart(Long memberId, Long storeId, Long productId) {
-
         Member member = findMemberById(memberId);
         Store store = findStoreById(storeId);
 
@@ -87,7 +85,6 @@ public class CartService {
 
     @Transactional
     public void clearCart(Long memberId, Long storeId) {
-
         Member member = findMemberById(memberId);
         Store store = findStoreById(storeId);
 
@@ -95,7 +92,7 @@ public class CartService {
         cart.clearCart();
     }
 
-    //==================================================================================================================
+
     private Member findMemberById(Long memberId) {
         return memberRepository.findById(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
@@ -112,8 +109,8 @@ public class CartService {
     }
 
     private Order findCartByMemberAndStore(Member member, Store store) {
-        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.CART)
-                .orElse(List.of());
+        List<Order> carts = orderRepository.findByMemberAndStatus(member, OrderStatus.CART)
+                .orElse(Collections.emptyList());
 
         return carts.stream()
                 .filter(order -> order.getStore().equals(store))
@@ -124,26 +121,23 @@ public class CartService {
     private Order findOrCreateCart(Member member, Store store) {
         Order cart = findCartByMemberAndStore(member, store);
 
-        if(cart == null) {
+        if (cart == null) {
             cart = Order.of(member, store);
             return orderRepository.save(cart);
         }
-
         return cart;
     }
 
     private Order getExistingCart(Member member, Store store) {
-        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.CART)
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
-
-        return carts.stream()
-                .filter(order -> order.getStore().equals(store))
-                .findFirst()
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
+        Order cart = findCartByMemberAndStore(member, store);
+        if (cart == null) {
+            throw new CustomException(ErrorCode.CART_NOT_FOUND);
+        }
+        return cart;
     }
 
     private void validateStock(Store store, Product product, int quantity) {
-        if(!storeStockRepository.existsOrderableStock(store, product, quantity)) {
+        if (!storeStockRepository.existsOrderableStock(store, product, quantity)) {
             throw new CustomException(ErrorCode.INSUFFICIENT_STOCK);
         }
     }

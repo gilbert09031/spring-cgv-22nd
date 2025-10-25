@@ -57,7 +57,14 @@ public enum ErrorCode {
     DUPLICATED_EMAIL(HttpStatus.CONFLICT, "A005", "이미 존재하는 이메일입니다."),
 
     // 500 Internal Server Error
-    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C007", "서버 내부 오류가 발생했습니다.");
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C007", "서버 내부 오류가 발생했습니다."),
+
+    PAYMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "P001", "결제 정보를 찾을 수 없습니다."),
+    PAYMENT_ALREADY_EXISTS(HttpStatus.CONFLICT, "P002", "이미 결제가 존재합니다."),
+    PAYMENT_FAILED(HttpStatus.BAD_REQUEST, "P003", "결제 처리에 실패했습니다."),
+    PAYMENT_CANCEL_FAILED(HttpStatus.BAD_REQUEST, "P004", "결제 취소에 실패했습니다."),
+    INVALID_ORDER_STATUS(HttpStatus.BAD_REQUEST, "O006", "유효하지 않은 주문 상태입니다.");
+
 
 
     private final HttpStatus status;

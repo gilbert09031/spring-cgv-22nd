@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,37 +35,54 @@ public class OrderService {
 
     @Transactional
     public OrderResponse createOrder(Long memberId, OrderCreateRequest request) {
-
         Member member = findMemberById(memberId);
         Store store = findStoreById(request.storeId());
 
         Order cart = getCart(member, store);
 
         validateCartNotEmpty(cart);
-        decreaseStockForOrder(cart);
 
-        cart.confirmOrder();
+        cart.pendPayment();
 
         return OrderResponse.from(cart);
     }
 
-    public List<OrderResponse> getMyOrders(Long memberId) {
+    @Transactional
+    public void confirmOrderAfterPayment(Long orderId) {
+        Order order = findOrderById(orderId);
 
+        decreaseStockForOrder(order);
+
+        order.completePayment();
+    }
+
+    @Transactional
+    public void cancelOrderAfterPaymentCancel(Long orderId) {
+        Order order = findOrderById(orderId);
+
+        if (order.getStatus() == OrderStatus.CONFIRMED) {
+            increaseStockForOrder(order);
+        }
+
+        order.cancelPayment();
+    }
+
+    public List<OrderResponse> getMyOrders(Long memberId) {
         Member member = findMemberById(memberId);
 
         List<Order> allOrders = orderRepository.findByMember(member);
 
         List<Order> orders = allOrders.stream()
                 .filter(order -> order.getStatus() != OrderStatus.CART)
-                .collect(Collectors.toList());
+                .toList();
 
         return orders.stream()
                 .map(OrderResponse::from)
                 .collect(Collectors.toList());
     }
 
-    public OrderResponse getOrderDetail(Long memberId, Long orderId) {
 
+    public OrderResponse getOrderDetail(Long memberId, Long orderId) {
         Member member = findMemberById(memberId);
         Order order = findOrderById(orderId);
 
@@ -74,14 +92,6 @@ public class OrderService {
         return OrderResponse.from(order);
     }
 
-    @Transactional
-    public void completeOrder(Long orderId) {
-
-        Order order = findOrderById(orderId);
-        order.completeOrder();
-    }
-
-    //=================================================================================================================
     private Member findMemberById(Long memberId) {
         return memberRepository.findById(memberId)
                 .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
@@ -98,15 +108,15 @@ public class OrderService {
     }
 
     private Order getCart(Member member, Store store) {
-        List<Order> carts = orderRepository.findByMemberAndOrderStatus(member, OrderStatus.CART)
-                .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
+        List<Order> carts = orderRepository.findByMemberAndStatus(member, OrderStatus.CART)
+                .orElse(Collections.emptyList());
 
         return carts.stream()
                 .filter(order -> order.getStore().getStoreId().equals(store.getStoreId()))
                 .findFirst()
                 .orElseThrow(() -> new CustomException(ErrorCode.CART_NOT_FOUND));
     }
-    //=================================================================================================================
+
     private void validateCartNotEmpty(Order cart) {
         if (cart.getOrderDetails().isEmpty()) {
             throw new CustomException(ErrorCode.CART_EMPTY);
@@ -119,29 +129,44 @@ public class OrderService {
         }
     }
 
-    private void validateOrderNotCompleted(Order order) {
-        if (order.getStatus() == OrderStatus.COMPLETED) {
-            throw new CustomException(ErrorCode.ORDER_ALREADY_COMPLETED);
-        }
-    }
-
     private void validateOrderNotCart(Order order) {
         if (order.getStatus() == OrderStatus.CART) {
             throw new CustomException(ErrorCode.ORDER_NOT_FOUND);
         }
     }
 
-    //=================================================================================================================
-    private void decreaseStockForOrder(Order cart) {
-        for (OrderDetail detail : cart.getOrderDetails()) {
+
+    private void decreaseStockForOrder(Order order) {
+        for (OrderDetail detail : order.getOrderDetails()) {
             try {
                 storeService.decreaseStock(
-                        cart.getStore().getStoreId(),
+                        order.getStore().getStoreId(),
+                        detail.getProduct().getProductId(),
+                        detail.getQuantity()
+                );
+            } catch (CustomException e) {
+                log.error("재고 차감 실패: orderId={}, productId={}, quantity={}, error={}",
+                        order.getOrderId(), detail.getProduct().getProductId(), detail.getQuantity(), e.getMessage());
+                throw e;
+            } catch (Exception e) {
+                log.error("재고 차감 중 예상치 못한 오류 발생: orderId={}, productId={}, quantity={}",
+                        order.getOrderId(), detail.getProduct().getProductId(), detail.getQuantity(), e);
+                throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+
+    private void increaseStockForOrder(Order order) {
+        for (OrderDetail detail : order.getOrderDetails()) {
+            try {
+                storeService.increaseStock(
+                        order.getStore().getStoreId(),
                         detail.getProduct().getProductId(),
                         detail.getQuantity()
                 );
             } catch (Exception e) {
-                throw new CustomException(ErrorCode.INSUFFICIENT_STOCK);
+                log.error("재고 복구 실패: orderId={}, productId={}, quantity={}, error={}",
+                        order.getOrderId(), detail.getProduct().getProductId(), detail.getQuantity(), e.getMessage());
             }
         }
     }

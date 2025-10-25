@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "orders") // DB 키워드인 ORDER와 겹치지 않게 테이블 이름 명시
+@Table(name = "orders")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Order extends BaseEntity {
@@ -48,7 +48,7 @@ public class Order extends BaseEntity {
     public static Order of(Member member, Store store) {
         return new Order(member, store);
     }
-    //==================================================================================================================
+
     public void addOrderDetail(OrderDetail orderDetail) {
         this.orderDetails.add(orderDetail);
         orderDetail.setOrder(this);
@@ -66,7 +66,6 @@ public class Order extends BaseEntity {
                 .mapToInt(OrderDetail::getSubtotal)
                 .sum();
     }
-    //=====================장바구니======================================================================================
 
     public void addToCart(Product product, Integer quantity) {
         validateCartStatus();
@@ -75,16 +74,15 @@ public class Order extends BaseEntity {
 
         if (existingDetail != null) {
             existingDetail.changeQuantity(existingDetail.getQuantity() + quantity);
-            calculateTotalPrice();
         } else {
             OrderDetail newOrderDetail = OrderDetail.of(product, quantity);
             addOrderDetail(newOrderDetail);
         }
+        calculateTotalPrice();
     }
 
     public void removeFromCart(Long productId) {
         validateCartStatus();
-
         OrderDetail orderDetail = findOrderDetailsByProductId(productId);
         if (orderDetail == null) {
             throw new IllegalArgumentException("장바구니에 해당 상품 없음");
@@ -94,12 +92,10 @@ public class Order extends BaseEntity {
 
     public void updateCartItemQuantity(Long productId, Integer quantity) {
         validateCartStatus();
-
         OrderDetail orderDetail = findOrderDetailsByProductId(productId);
         if (orderDetail == null) {
             throw new IllegalArgumentException("장바구니에 해당 상품 없음");
         }
-
         orderDetail.changeQuantity(quantity);
         calculateTotalPrice();
     }
@@ -109,19 +105,22 @@ public class Order extends BaseEntity {
         orderDetails.clear();
         calculateTotalPrice();
     }
-    // ================================================================================================================
-    public void confirmOrder() {
+
+    public void pendPayment() {
         validateCartStatus();
         validateCartNotEmpty();
+        this.status = OrderStatus.PENDING;
+    }
+
+    public void completePayment() {
+        validatePendingStatus();
         this.status = OrderStatus.CONFIRMED;
     }
 
-    public void completeOrder() {
-        validateConfirmedStatus();
-        this.status = OrderStatus.COMPLETED;
+    public void cancelPayment() {
+        validatePendingOrConfirmedStatus();
+        this.status = OrderStatus.CANCELLED;
     }
-
-    // ================================================================================================================
 
     private OrderDetail findOrderDetailsByProduct(Product product) {
         return orderDetails.stream()
@@ -137,20 +136,26 @@ public class Order extends BaseEntity {
                 .orElse(null);
     }
 
-    private void validateCartStatus() {
-        if(this.status != OrderStatus.CART) {
-            throw new IllegalStateException("장바구니 상태가 아닙니다");
+    private void validatePendingStatus() {
+        if (this.status != OrderStatus.PENDING) {
+            throw new IllegalStateException("결제 대기 상태가 아닙니다.");
         }
     }
 
-    private void validateConfirmedStatus() {
-        if(this.status != OrderStatus.CONFIRMED) {
-            throw new IllegalArgumentException("주문완료 상태가 아닙니다");
+    private void validatePendingOrConfirmedStatus() {
+        if (this.status != OrderStatus.PENDING && this.status != OrderStatus.CONFIRMED) {
+            throw new IllegalStateException("결제 대기 또는 주문 완료 상태가 아닙니다.");
+        }
+    }
+
+    private void validateCartStatus() {
+        if (this.status != OrderStatus.CART) {
+            throw new IllegalStateException("장바구니 상태가 아닙니다.");
         }
     }
 
     private void validateCartNotEmpty() {
-        if(orderDetails.isEmpty()){
+        if (orderDetails.isEmpty()) {
             throw new IllegalStateException("장바구니가 비어있습니다.");
         }
     }
