@@ -37,33 +37,15 @@ public class ScheduleService {
     private final ReservationSeatRepository reservationSeatRepository;
 
     public ScheduleResponse createSchedule(ScheduleCreateRequest request) {
-        // 제약사항 4: 영화 및 상영관 존재 여부 확인
-        Movie movie = movieRepository.findById(request.movieId())
-                .orElseThrow(() -> new CustomException(ErrorCode.MOVIE_NOT_FOUND));
-        Screen screen = screenRepository.findById(request.screenId())
-                .orElseThrow(() -> new CustomException(ErrorCode.SCREEN_NOT_FOUND));
+        Movie movie = findMovieById(request.movieId());
+        Screen screen = findScreenById(request.screenId());
 
-        if (request.startTime().isAfter(request.endTime())) {
-            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-        }
+        validateScreenTime(request.startTime(), request.endTime(),movie.getRunningTime());
+        validateSchedule(screen, request.startTime(), request.endTime());
 
-        long duration = Duration.between(request.startTime(), request.endTime()).toMinutes();
-        if (duration != movie.getRunningTime()) {
-            throw new CustomException(ErrorCode.INVALID_RUNNING_TIME);
-        }
-
-        if (scheduleRepository.existsByScreenAndStartTimeBetween(screen, request.startTime(), request.endTime())) {
-            throw new CustomException(ErrorCode.SCHEDULE_CONFLICT);
-        }
-
-        Schedule schedule = Schedule.builder()
-                .movie(movie)
-                .screen(screen)
-                .startTime(request.startTime())
-                .endTime(request.endTime())
-                .build();
-
+        Schedule schedule = Schedule.of(movie, screen, request.startTime(), request.endTime());
         Schedule savedSchedule = scheduleRepository.save(schedule);
+
         return ScheduleResponse.from(savedSchedule);
     }
 
@@ -81,14 +63,43 @@ public class ScheduleService {
 
     @Transactional(readOnly = true)
     public ScheduleSeatResponse findScheduleWithSeatStatus(Long scheduleId) {
-        Schedule schedule = scheduleRepository.findById(scheduleId)
-                .orElseThrow(() -> new CustomException(ErrorCode.SCHEDULE_NOT_FOUND));
-
-        List<ReservationSeat> reservedSeats = reservationSeatRepository.findAllByScheduleId(schedule.getScheduleId());
-        Set<Long> reservedSeatIds = reservedSeats.stream()
-                .map(reservationSeat  -> reservationSeat.getSeat().getSeatId())
-                .collect(Collectors.toSet());
+        Schedule schedule = findScheduleById(scheduleId);
+        Set<Long> reservedSeatIds = findReservedSeatIdsByScheduleId(scheduleId);
 
         return ScheduleSeatResponse.from(schedule, reservedSeatIds);
+    }
+    // =================================================================================================================
+    private Movie findMovieById(Long id) {
+        return movieRepository.findById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.MOVIE_NOT_FOUND));
+    }
+    private Screen findScreenById(Long id) {
+        return screenRepository.findById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.SCREEN_NOT_FOUND));
+    }
+    private Schedule findScheduleById(Long id) {
+        return scheduleRepository.findById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.SCHEDULE_NOT_FOUND));
+    }
+    private Set<Long> findReservedSeatIdsByScheduleId(Long scheduleId) {
+        List<ReservationSeat> reservedSeats = reservationSeatRepository.findAllByScheduleId(scheduleId);
+        return reservedSeats.stream()
+                .map(reservationSeat  -> reservationSeat.getSeat().getSeatId())
+                .collect(Collectors.toSet());
+    }
+    // =================================================================================================================
+    private void validateScreenTime(LocalDateTime startTime, LocalDateTime endTime, Integer runningTime) {
+        if(startTime.isAfter(endTime)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        if(runningTime != Duration.between(startTime, endTime).toMinutes()) {
+            throw new CustomException(ErrorCode.INVALID_RUNNING_TIME);
+        }
+    }
+
+    private void validateSchedule(Screen screen, LocalDateTime startTime, LocalDateTime endTime) {
+        if(scheduleRepository.existsByScreenAndStartTimeBetween(screen, startTime, endTime)) {
+            throw new CustomException(ErrorCode.SCHEDULE_CONFLICT);
+        }
     }
 }

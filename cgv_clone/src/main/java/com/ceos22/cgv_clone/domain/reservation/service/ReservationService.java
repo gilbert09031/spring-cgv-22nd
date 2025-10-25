@@ -33,29 +33,21 @@ public class ReservationService {
     private final SeatRepository seatRepository;
 
     public ReservationResponse createReservation(ReservationCreateRequest request) {
-        Member member = memberRepository.findById(request.memberId())
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
-        Schedule schedule = scheduleRepository.findById(request.scheduleId())
-                .orElseThrow(() -> new CustomException(ErrorCode.SCHEDULE_NOT_FOUND));
+        Member member = findMemberById(request.memberId());
+        Schedule schedule = findScheduleById(request.scheduleId());
+        List<Seat> seats = findSeatsByIds(request.seatIds());
 
-        List<Seat> seats = seatRepository.findAllById(request.seatIds());
         if(seats.size() != request.seatIds().size()) {
             throw new CustomException(ErrorCode.SEAT_NOT_FOUND);
         }
 
-        if(reservationSeatRepository.existsByScheduleIdAndSeatIds(schedule.getScheduleId(),request.seatIds())) {
-            throw new CustomException(ErrorCode.SEAT_ALREADY_RESERVED);
-        }
+        validateNotReserved(schedule, request.seatIds());
 
         // 이후 가격 정책 도입 후 수정
         int totalPrice = 10000 * seats.size();
 
         Reservation reservation = Reservation.create(member, schedule, totalPrice);
-
-        for (Seat seat : seats) {
-            ReservationSeat reservationSeat = ReservationSeat.create(seat);
-            reservation.addReservationSeat(reservationSeat);
-        }
+        reserveSeats(reservation, seats);
         reservationRepository.save(reservation);
 
         return ReservationResponse.from(reservation);
@@ -63,13 +55,43 @@ public class ReservationService {
 
     @Transactional(readOnly = true)
     public List<ReservationResponse> findMyReservations(Long memberId) {
-        Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
-
-        List<Reservation> reservations = reservationRepository.findByMember(member);
+        Member member = findMemberById(memberId);
+        List<Reservation> reservations = findReservationByMember(member);
 
         return reservations.stream()
                 .map(ReservationResponse::from)
                 .collect(Collectors.toList());
+    }
+
+    //==================================================================================================================
+    public Member findMemberById(Long id) {
+        return memberRepository.findById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+    }
+
+    public Schedule findScheduleById(Long id) {
+        return scheduleRepository.findById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.SCHEDULE_NOT_FOUND));
+    }
+
+    public List<Seat> findSeatsByIds(List<Long> seatIds) {
+        return seatRepository.findAllById(seatIds);
+    }
+
+    public List<Reservation> findReservationByMember(Member member) {
+        return reservationRepository.findByMember(member)
+                .orElseThrow(() -> new CustomException(ErrorCode.RESOURCE_NOT_FOUND));
+    }
+    //==================================================================================================================
+    private void validateNotReserved(Schedule schedule, List<Long> seatIds) {
+        if(reservationSeatRepository.existsByScheduleIdAndSeatIds(schedule.getScheduleId(), seatIds))
+            throw new CustomException(ErrorCode.SEAT_ALREADY_RESERVED);
+    }
+    //==================================================================================================================
+    private void reserveSeats(Reservation reservation, List<Seat> seats) {
+        for(Seat seat : seats) {
+            ReservationSeat newSeat = ReservationSeat.create(seat);
+            reservation.addReservationSeat(newSeat);
+        }
     }
 }
