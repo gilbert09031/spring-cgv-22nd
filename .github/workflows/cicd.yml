@@ -54,50 +54,83 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/cgv-clone:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/cgv-clone:${{ github.sha }}
 
-      - name: Deploy to EC2
+      - name: Deploy to EC2 with Docker Compose
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Docker 네트워크 생성 (없으면)
-            docker network create cgv-network 2>/dev/null || true
+            # 작업 디렉토리 처리 (파일/디렉토리 충돌 방지)
+            if [ -f ~/cgv-app ]; then
+              echo "Removing...cgv-app"
+              rm -f ~/cgv-app
+            fi
             
-            # 기존 컨테이너 정리
-            docker stop cgv-app redis 2>/dev/null || true
-            docker rm cgv-app redis 2>/dev/null || true
+            mkdir -p ~/cgv-app
+            cd ~/cgv-app
+            
+            # .env 파일 생성 (GitHub Secrets에서 주입)
+            cat > .env << EOF
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_USERNAME=${{ secrets.DB_USERNAME }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_PORT=${{ secrets.DB_PORT }}
+            REDIS_PORT=${{ secrets.REDIS_PORT }}
+            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            PAYMENT_API_SECRET=${{ secrets.PAYMENT_API_SECRET }}
+            PAYMENT_STORE_ID=${{ secrets.PAYMENT_STORE_ID }}
+            DOCKER_IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/cgv-clone:latest
+            EOF
+            
+            echo ".env file created successfully"
+
+      - name: Copy docker-compose.prod.yml to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.prod.yml"
+          target: "~/cgv-app"
+
+      - name: Deploy with Docker Compose
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd ~/cgv-app
             
             # Docker 이미지 Pull
             docker pull ${{ secrets.DOCKERHUB_USERNAME }}/cgv-clone:latest
             
-            # Redis 컨테이너 실행
-            docker run -d \
-              --name redis \
-              --network cgv-network \
-              -p 6379:6379 \
-              redis:7-alpine
+            # Docker Compose로 배포
+            docker-compose -f docker-compose.prod.yml down
+            docker-compose -f docker-compose.prod.yml up -d
             
-            # 애플리케이션 컨테이너 실행
-            docker run -d \
-              --name cgv-app \
-              --network cgv-network \
-              -p 8080:8080 \
-              -e SPRING_PROFILES_ACTIVE=docker \
-              -e DB_HOST=${{ secrets.DB_HOST }} \
-              -e DB_PORT=${{ secrets.DB_PORT }} \
-              -e DB_NAME=${{ secrets.DB_NAME }} \
-              -e DB_USERNAME=${{ secrets.DB_USERNAME }} \
-              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-              -e REDIS_HOST=redis \
-              -e REDIS_PORT=6379 \
-              -e REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }} \
-              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
-              -e PAYMENT_API_SECRET=${{ secrets.PAYMENT_API_SECRET }} \
-              -e PAYMENT_STORE_ID=${{ secrets.PAYMENT_STORE_ID }} \
-              ${{ secrets.DOCKERHUB_USERNAME }}/cgv-clone:latest
-            
-            # 컨테이너 시작 대기 및 로그 확인
+            # 컨테이너 시작 대기
             echo "Waiting for application to start..."
-            sleep 10
-            docker logs cgv-app --tail 50
+            sleep 30
+            
+            # 헬스체크
+            for i in {1..10}; do
+              HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/actuator/health 2>/dev/null || echo "000")
+            
+              if [ "$HTTP_STATUS" = "200" ]; then
+                echo "Deployment successful!"
+                docker-compose -f docker-compose.prod.yml logs --tail=50
+                exit 0
+              fi
+            
+              echo "Waiting for health check... ($i/10)"
+              sleep 5
+            done
+            
+            # 배포 실패 시
+            echo "Deployment failed. Rolling back..."
+            docker-compose -f docker-compose.prod.yml logs --tail=100
+            docker-compose -f docker-compose.prod.yml down
+            exit 1
