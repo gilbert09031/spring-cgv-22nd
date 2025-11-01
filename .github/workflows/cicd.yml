@@ -113,7 +113,7 @@ jobs:
             
             # 컨테이너 시작 대기
             echo "Waiting for application to start..."
-            sleep 30
+            sleep 60
             
             # 헬스체크
             for i in {1..10}; do
