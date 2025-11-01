@@ -35,7 +35,9 @@ public class SecurityConfig {
             "/swagger-resources/**",
             "/webjars/**",
             "/api-docs/**",
-            "/v3/api-docs/**"
+            "/v3/api-docs/**",
+            "/actuator/health",      // 헬스체크 엔드포인트 추가
+            "/actuator/health/**"    // 상세 헬스체크 정보도 허용
     };
 
     @Bean
@@ -43,7 +45,7 @@ public class SecurityConfig {
         http
                 // CSRF 비활성화
                 .csrf(AbstractHttpConfigurer::disable)
-                //세션 비활성화
+                // 세션 비활성화
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // 폼 로그인 비활성화
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -54,11 +56,8 @@ public class SecurityConfig {
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
                 .authorizeHttpRequests(authorize -> authorize
-                        // 회원가입, 로그인 URL 공개 설정
                         .requestMatchers(PERMIT_ALL_URL_PATTERNS).permitAll()
-                        // 관리자 URL 권한 설정
-                        .requestMatchers("api/admin/*").hasRole("ADMIN")
-                        // 이외의 경로는 인증된 사용자에 한해 접근 허용
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 );
 
