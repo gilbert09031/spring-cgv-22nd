@@ -7,6 +7,8 @@ COPY build.gradle settings.gradle gradlew /app/
 COPY gradle /app/gradle
 COPY src /app/src
 
+RUN chmod +x ./gradlew
+
 RUN ./gradlew build
 
 # 최종 실행 이미지 생성
