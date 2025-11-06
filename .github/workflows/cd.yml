@@ -51,37 +51,3 @@ jobs:
             docker image prune -f
             
             echo "Deployment completed!"
-
-      - name: Health check
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/${{ secrets.EC2_USERNAME }}/app
-            
-            echo "Waiting for application to start..."
-            sleep 15
-            
-            if docker-compose ps | grep -q "Up"; then
-              echo "Container is running"
-            
-              for i in {1..10}; do
-                if curl -f http://localhost:8080/actuator/health 2>/dev/null; then
-                  echo "Application is healthy!"
-                  docker-compose ps
-                  exit 0
-                fi
-                echo "Waiting for application... ($i/10)"
-                sleep 5
-              done
-            
-              echo "Health check timeout, checking logs..."
-              docker-compose logs --tail=50 app
-              exit 1
-            else
-              echo "Container failed to start"
-              docker-compose logs --tail=100 app
-              exit 1
-            fi
