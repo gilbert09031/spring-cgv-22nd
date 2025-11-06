@@ -1,0 +1,87 @@
+name: CD
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create .env file
+        run: |
+          cat << 'EOF' > .env
+          ${{ secrets.ENV_FILE }}
+          EOF
+
+      - name: Copy .env AND docker-compose to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,.env"
+          target: "/home/${{ secrets.EC2_USERNAME }}/app"
+
+      - name: Deploy with Docker Compose
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.EC2_USERNAME }}/app
+            
+            echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+            
+            docker-compose pull app
+            
+            docker-compose down
+            
+            docker-compose up -d
+            
+            docker image prune -f
+            
+            echo "Deployment completed!"
+
+      - name: Health check
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/${{ secrets.EC2_USERNAME }}/app
+            
+            echo "Waiting for application to start..."
+            sleep 15
+            
+            if docker-compose ps | grep -q "Up"; then
+              echo "Container is running"
+            
+              for i in {1..10}; do
+                if curl -f http://localhost:8080/actuator/health 2>/dev/null; then
+                  echo "Application is healthy!"
+                  docker-compose ps
+                  exit 0
+                fi
+                echo "Waiting for application... ($i/10)"
+                sleep 5
+              done
+            
+              echo "Health check timeout, checking logs..."
+              docker-compose logs --tail=50 app
+              exit 1
+            else
+              echo "Container failed to start"
+              docker-compose logs --tail=100 app
+              exit 1
+            fi
