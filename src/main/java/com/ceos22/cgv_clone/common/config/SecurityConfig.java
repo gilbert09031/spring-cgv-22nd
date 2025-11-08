@@ -36,7 +36,7 @@ public class SecurityConfig {
             "/webjars/**",
             "/api-docs/**",
             "/v3/api-docs/**",
-            "actuator/**"
+            "/actuator/**"
     };
 
     @Bean
