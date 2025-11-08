@@ -37,6 +37,7 @@ public class PaymentService {
     private final PaymentClient paymentClient;
     private final ObjectMapper objectMapper;
     private final OrderService orderService;
+    private final com.ceos22.cgv_clone.common.metrics.PaymentMetrics paymentMetrics;
 
     @Value("${payment.mock.store-id}")
     private String mockStoreId;
@@ -45,7 +46,7 @@ public class PaymentService {
     private String currency;
 
     @Transactional
-    public PaymentResponse createPayment(Member member, PaymentCreateRequest request) {
+    public PaymentResponse executePayment(Member member, PaymentCreateRequest request) {
 
         Order order = findOrderById(request.orderId());
 
@@ -55,6 +56,8 @@ public class PaymentService {
 
         Payment payment = createAndSavePaymentWithRetry(order);
         externalPayment(payment);
+
+        paymentMetrics.incrementPaymentSuccess();
 
         return PaymentResponse.from(payment);
     }
@@ -92,6 +95,11 @@ public class PaymentService {
         Payment payment = findPaymentByOrder(order);
         return PaymentResponse.from(payment);
     }
+
+    //=================================================================================================================
+
+
+    //=================================================================================================================
 
     private Payment createAndSavePaymentWithRetry(Order order) {
 
@@ -145,6 +153,8 @@ public class PaymentService {
             payment.fail(e.getMessage());
             paymentRepository.save(payment);
             log.error("[결제 실패] - paymentId: {}, error: {}", payment.getPaymentId(), e.getMessage());
+
+            paymentMetrics.incrementPaymentSuccess();
             throw new CustomException(ErrorCode.PAYMENT_FAILED);
         }
     }

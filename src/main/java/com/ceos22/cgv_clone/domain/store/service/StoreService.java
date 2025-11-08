@@ -32,6 +32,7 @@ public class StoreService {
     private final StoreStockRepository storeStockRepository;
     private final ProductRepository productRepository;
     private final TheaterRepository theaterRepository;
+    private final com.ceos22.cgv_clone.common.metrics.PaymentMetrics paymentMetrics;
 
     public List<StoreResponse> findStoresByTheater(Long theaterId) {
 
@@ -117,6 +118,8 @@ public class StoreService {
                 .orElseThrow(() -> new CustomException(ErrorCode.STOCK_NOT_FOUND));
 
         storeStock.decreaseStock(quantity);
+
+        paymentMetrics.recordStockDecrease(quantity);
     }
 
 }
