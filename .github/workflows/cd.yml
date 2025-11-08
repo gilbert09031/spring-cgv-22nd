@@ -39,7 +39,7 @@ jobs:
             ${{ secrets.ENV_FILE}}
             EOF
             
-            if [! -f .env]; then
+            if [ ! -f .env ]; then
               echo "ERROR : .env NOT Created"
               exit 1
             fi
